@@ -3,13 +3,14 @@ import sys
 import json
 from StringIO import StringIO
 from subprocess import Popen
+from minify_json import json_minify
 
 
 def get_default_streams(streams):
     if not 'input' in streams:
         streams['input'] = sys.stdin
-    if not 'input' in streams:
-        streams['input'] = sys.stdin
+    if not 'output' in streams:
+        streams['output'] = sys.stdout
     if not 'error' in streams:
         streams['error'] = sys.stderr
     return streams
@@ -18,6 +19,7 @@ def get_default_streams(streams):
 class Process(object):
 
     def __init__(self):
+        self.description = dict()
         self.streams = {
             'input': sys.stdin,
             'output': sys.stdout,
@@ -31,7 +33,11 @@ class Process(object):
 
     def parse_input(self):
         '''Parse program parameters from input stream'''
-        input_parameters = json.load(self.streams['input'])
+        json_data = self.streams['input'].read()
+        json_data = json_minify(json_data, strip_space=False)
+        if not json_data:
+            return
+        input_parameters = json.loads(json_data)
         self.parameters.update(input_parameters)
 
     def print_line(self, line, stream_name='output', append_newline=True):
@@ -48,7 +54,6 @@ class Process(object):
         '''Prepare and stream output'''
         return json.dumps(self.results)
 
-
     def execute(self, default_parameters={}):
         self.parameters.update(default_parameters)
         self.put_on()
@@ -56,7 +61,7 @@ class Process(object):
         self.reduce()
 
     def put_on(self):
-        '''Increase execution. Happens before run()'''
+        '''Induce execution. Happens before run(). Can be job split.'''
         # Input
         self.parse_input()
 
@@ -67,7 +72,7 @@ class Process(object):
         '''
 
     def reduce(self):
-        '''Reduce execution. Happens after run()'''
+        '''Reduce execution. Happens after run(). Can be results join.'''
         # Output
         output = self.bake_output()
         self.streams['output'].write(output)
@@ -124,9 +129,9 @@ class Pipe(object):
     '''
 
     def __init__(self, definition):
-        self.process_namespace = __import__('pippete')
+        self.process_namespace = 'pippete'
         self.definition = definition
-        self.chain = list(self.bake_process())
+        self.chain = None
 
     @property
     def name(self):
@@ -135,7 +140,14 @@ class Pipe(object):
     @classmethod
     def parse_definition(self, definition_filepath):
         with open(definition_filepath) as definition_file:
-            definition = json.load(definition_file)
+            try:
+                # skip comments
+                json_data = json_minify(definition_file.read(),
+                                        strip_space=False)
+                definition = json.loads(json_data)
+            except ValueError as error:
+                raise IOError('JSON parsing error in: "%s".\n%s' %
+                              (definition_filepath, error.message))
         # Get pipe name.
         pipe_filename = os.path.basename(definition_filepath)
         if not pipe_filename.endswith('Pipe.json'):
@@ -154,7 +166,10 @@ class Pipe(object):
             yield process
 
     def find_process_class(self, process_type):
-        return getattr(self.process_namespace, process_type)
+        process_type = self.process_namespace + '.' + process_type
+        module_name, class_name = process_type.rsplit('.', 1)
+        module = __import__(module_name, {}, {}, [class_name])
+        return getattr(module, class_name)
 
     def instantiate_process(self, process_description,
                             default_type='BashCommand'):
@@ -162,10 +177,16 @@ class Pipe(object):
             process_description.get('type', default_type))
         process = cls()
         assert isinstance(process, Process)
+        default_process_name = process.__class__.__name__.lower()
+        process.parameters['name'] = process_description.get(
+            'name', default_process_name,
+        )
+        process.description.update(process_description)
         return process
 
     def communicate(self, pipe_streams={}):
         pipe_streams = get_default_streams(pipe_streams)
+        self.chain = list(self.bake_processes())
         chain_size = len(self.chain)
         assert chain_size > 0
         output_stream = StringIO()
