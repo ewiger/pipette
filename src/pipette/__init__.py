@@ -17,7 +17,7 @@ from subprocess import Popen
 from minify_json import json_minify
 
 
-__version__ = '0.1.1'
+__version__ = '0.1.2'
 
 
 def get_default_streams(streams):
