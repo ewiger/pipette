@@ -41,6 +41,7 @@ setup(
         'Topic :: Scientific/Engineering :: Information Analysis',
         'Intended Audience :: Developers',
         'Programming Language :: Python',
+        'Topic :: Software Development :: Libraries :: Python Modules',
         'Development Status :: 5 - Production/Stable',
         'Operating System :: POSIX :: Linux',
         'Operating System :: MacOS',
