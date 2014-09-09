@@ -30,7 +30,7 @@ setup(
     long_description=readme(),
     author='Yauhen Yakimovich',
     author_email='eugeny.yakimovitch@gmail.com',
-    url='https://github.com/pelkmanslab/iBRAIN',
+    url='https://github.com/ewiger/pipette/',
     license='MIT',
     packages=[
         'pipette',
