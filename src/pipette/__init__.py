@@ -1,9 +1,23 @@
+'''
+pipette
+=======
+
+A library implementing a protocol to simplify programming pipeline-like
+chains of intercommunicating processes.
+
+Copyright (c) 2014 Yauhen Yakimovich
+Licensed under the MIT License (MIT). Read a copy of LICENSE distributed with
+this code.
+'''
 import os
 import sys
 import json
 from StringIO import StringIO
 from subprocess import Popen
 from minify_json import json_minify
+
+
+__version__ = '0.1.1'
 
 
 def get_default_streams(streams):
