@@ -11,13 +11,16 @@ this code.
 '''
 import os
 import sys
-import json
 from StringIO import StringIO
 from subprocess import Popen
-from minify_json import json_minify
+import yaml
+try:
+    from yaml import CLoader as Loader, CDumper as Dumper
+except ImportError:
+    from yaml import Loader, Dumper
 
 
-__version__ = '0.1.2'
+__version__ = '0.1.3'
 
 
 def get_default_streams(streams):
@@ -47,11 +50,8 @@ class Process(object):
 
     def parse_input(self):
         '''Parse program parameters from input stream'''
-        json_data = self.streams['input'].read()
-        json_data = json_minify(json_data, strip_space=False)
-        if not json_data:
-            return
-        input_parameters = json.loads(json_data)
+        input_stream = self.streams['input']
+        input_parameters = yaml.load(input_stream, Loader=Loader)
         self.parameters.update(input_parameters)
 
     def print_line(self, line, stream_name='output', append_newline=True):
@@ -66,7 +66,7 @@ class Process(object):
 
     def bake_output(self):
         '''Prepare and stream output'''
-        return json.dumps(self.results)
+        return yaml.dump(self.results, Dumper=Dumper)
 
     def execute(self, default_parameters={}):
         self.parameters.update(default_parameters)
@@ -139,11 +139,11 @@ class BashCommand(Process):
 
 class Pipe(object):
     '''
-    A trivial chain of processes defined by JSON.
+    A trivial chain of processes defined by YAML.
     '''
 
-    def __init__(self, definition):
-        self.process_namespace = 'pippete'
+    def __init__(self, process_namespace='pippete', definition=None):
+        self.process_namespace = process_namespace
         self.definition = definition
         self.chain = None
 
@@ -151,24 +151,28 @@ class Pipe(object):
     def name(self):
         return self.definition['name']
 
-    @classmethod
-    def parse_definition(self, definition_filepath):
-        with open(definition_filepath) as definition_file:
-            try:
-                # skip comments
-                json_data = json_minify(definition_file.read(),
-                                        strip_space=False)
-                definition = json.loads(json_data)
-            except ValueError as error:
-                raise IOError('JSON parsing error in: "%s".\n%s' %
-                              (definition_filepath, error.message))
+    @property
+    def pipe_extension(self):
+        return '.pipe'
+
+    def parse_definition_file(self, definition_filepath):
         # Get pipe name.
         pipe_filename = os.path.basename(definition_filepath)
-        if not pipe_filename.endswith('Pipe.json'):
+        if not pipe_filename.endswith(self.pipe_extension):
             raise Exception('Wrong pipe description filename: %s' %
                             pipe_filename)
-        definition['name'] = pipe_filename.replace('Pipe.json', '')
-        return definition
+        pipe_name = pipe_filename.replace(self.pipe_extension, '')
+        # Parse stream.
+        with open(definition_filepath) as definition_stream:
+            try:
+                self.parse_definition(pipe_name, definition_stream)
+            except ValueError as error:
+                raise IOError('YAML parsing error in: "%s".\n%s' %
+                              (definition_filepath, error.message))
+
+    def parse_definition(self, pipe_name, stream):
+        self.definition = {'name': pipe_name}
+        self.definition.update(yaml.load(stream, Loader=Loader))
 
     def bake_processes(self):
         '''Iterator that bakes processes'''
