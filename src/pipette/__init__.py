@@ -20,15 +20,15 @@ except ImportError:
     from yaml import Loader, Dumper
 
 
-__version__ = '0.1.3'
+__version__ = '0.1.4'
 
 
 def get_default_streams(streams):
-    if not 'input' in streams:
+    if 'input' not in streams:
         streams['input'] = sys.stdin
-    if not 'output' in streams:
+    if 'output' not in streams:
         streams['output'] = sys.stdout
-    if not 'error' in streams:
+    if 'error' not in streams:
         streams['error'] = sys.stderr
     return streams
 
@@ -131,9 +131,9 @@ class BashCommand(Process):
         subprocess.communicate()
         # Collect results.
         self.results.update(self.parameters)
-        if not 'output_filepath' in self.results:
+        if 'output_filepath' not in self.results:
             self.results['output'] = command_output.get_value()
-        if not 'error_filepath' in self.results:
+        if 'error_filepath' not in self.results:
             self.results['error'] = command_error.get_value()
 
 
@@ -166,9 +166,9 @@ class Pipe(object):
         with open(definition_filepath) as definition_stream:
             try:
                 self.parse_definition(pipe_name, definition_stream)
-            except ValueError as error:
+            except yaml.parser.ParserError as error:
                 raise IOError('YAML parsing error in: "%s".\n%s' %
-                              (definition_filepath, error.message))
+                              (definition_filepath, str(error)))
 
     def parse_definition(self, pipe_name, stream):
         self.definition = {'name': pipe_name}

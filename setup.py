@@ -37,6 +37,9 @@ setup(
     ],
     package_dir = {'':'src'},
     download_url='https://github.com/ewiger/pipette/tarball/master',
+    install_requires=[
+        'PyYAML>=3.11',
+    ],
     classifiers=[
         'Topic :: Scientific/Engineering :: Information Analysis',
         'Intended Audience :: Developers',
