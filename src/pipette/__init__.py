@@ -20,7 +20,7 @@ except ImportError:
     from yaml import Loader, Dumper
 
 
-__version__ = '0.1.4'
+__version__ = '0.1.5'
 
 
 def get_default_streams(streams):
@@ -142,8 +142,8 @@ class Pipe(object):
     A trivial chain of processes defined by YAML.
     '''
 
-    def __init__(self, process_namespace='pippete', definition=None):
-        self.process_namespace = process_namespace
+    def __init__(self, process_namespaces=['pippete'], definition=None):
+        self.process_namespaces = process_namespaces
         self.definition = definition
         self.chain = None
 
@@ -184,9 +184,17 @@ class Pipe(object):
             yield process
 
     def find_process_class(self, process_type):
-        process_type = self.process_namespace + '.' + process_type
-        module_name, class_name = process_type.rsplit('.', 1)
-        module = __import__(module_name, {}, {}, [class_name])
+        module = None
+        for process_namespace in self.process_namespaces:
+            process_type = process_namespace + '.' + process_type
+            module_name, class_name = process_type.rsplit('.', 1)
+            try:
+                module = __import__(module_name, {}, {}, [class_name])
+            except ImportError:
+                pass
+        if module is None:
+            raise ImportError('Failed to find/import process type: %s in %s' %
+                              (process_type, self.process_namespaces))
         return getattr(module, class_name)
 
     def instantiate_process(self, process_description,

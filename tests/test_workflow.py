@@ -32,7 +32,7 @@ chain:
 class BrainyTest(unittest.TestCase):
 
     def test_description_parsing(self):
-        pipe = Pipe(process_namespace='tests')
+        pipe = Pipe(process_namespaces=['tests'])
         pipe.parse_definition(pipe_name='foo', stream=StringIO(FOO))
         output = StringIO()
         pipe.communicate(pipe_streams={
