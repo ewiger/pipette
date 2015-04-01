@@ -18,8 +18,8 @@ def readme():
 def get_version():
     src_path = os.path.join(os.path.dirname(__file__), 'src')
     sys.path.append(src_path)
-    import pipette
-    return pipette.__version__
+    from pipette.version import pipette_version
+    return pipette_version
 
 
 setup(
