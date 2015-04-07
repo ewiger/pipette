@@ -26,6 +26,14 @@ chain:
 
 '''
 
+NO_TYPE = '''
+name: 'foo_pipe'
+
+chain:
+    - foo_value: 'baz'
+
+'''
+
 
 class BrainyTest(unittest.TestCase):
 
@@ -40,3 +48,19 @@ class BrainyTest(unittest.TestCase):
         process = pipe.chain.pop()
         expected_result = '{foo: bar}'
         assert process.streams['output'].getvalue().strip() == expected_result
+
+    def test_no_type_in_description(self):
+        pipe = Pipe(process_namespaces=['tests'])
+        pipe.parse_definition(pipe_name='foo', stream=StringIO(NO_TYPE))
+        output = StringIO()
+        error = StringIO()
+        with self.assertRaises(AttributeError):
+            pipe.communicate(pipe_streams={
+                'input': StringIO('{}'),
+                'output': output,
+                'error': error,
+            })
+        # process = pipe.chain.pop()
+        # expected_result = "'module' object has no attribute 'BashCommand'"
+        # print process.streams['error'].getvalue().strip()
+        # assert process.streams['error'].getvalue().strip() == expected_result
