@@ -44,7 +44,14 @@ class Process(object):
     def parse_input(self):
         '''Parse program parameters from input stream'''
         input_stream = self.streams['input']
-        input_parameters = yaml.load(input_stream, Loader=Loader)
+        input_yaml = ''
+        if isinstance(input_stream, basestring):
+            input_yaml = input_stream
+        elif hasattr(input_stream, 'read'):
+            input_yaml = input_stream.read()
+        else:
+            raise IOError('Can not read from input stream')
+        input_parameters = yaml.load(input_yaml, Loader=Loader)
         self.parameters.update(input_parameters)
 
     def print_line(self, line, stream_name='output', append_newline=True):
@@ -59,7 +66,7 @@ class Process(object):
 
     def bake_output(self):
         '''Prepare and stream output'''
-        return yaml.dump(self.results, Dumper=Dumper)
+        return yaml.dump(self.results)
 
     def execute(self, default_parameters={}):
         self.parameters.update(default_parameters)
@@ -238,6 +245,7 @@ class Pipe(object):
 
             # Maintain stream wiring.
             input_stream = output_stream
+            input_stream.seek(0)  # Make sure to rewind.
             output_stream = StringIO()
 
     def execute_process(self, process, parameters):
