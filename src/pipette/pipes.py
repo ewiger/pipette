@@ -167,8 +167,8 @@ class Pipe(object):
             try:
                 self.parse_definition(pipe_name, definition_stream)
             except yaml.parser.ParserError as error:
-                raise IOError('YAML parsing error in: "%s".\n%s' %
-                              (definition_filepath, str(error)))
+                raise IOError("File '%s' cannot be parsed as a YAML stream: %s"
+                              % (definition_filepath, error))
 
     def parse_definition(self, pipe_name, stream):
         self.definition = {'name': pipe_name}
