@@ -142,7 +142,7 @@ class Pipe(object):
     A trivial chain of processes defined by YAML.
     '''
 
-    def __init__(self, process_namespaces=['pippete'], definition=None):
+    def __init__(self, process_namespaces=['pipette'], definition=None):
         self.process_namespaces = process_namespaces
         self.definition = definition
         self.chain = None
