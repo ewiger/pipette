@@ -131,6 +131,15 @@ class BashCommand(Process):
 class Pipe(object):
     '''
     A trivial chain of processes defined by YAML.
+
+    The pipeline is defined by a single YAML file, which is read by
+    :meth:`parse_definition_file` *or* passed to the constructor with
+    the `definition` parameter.
+
+    The definition should contain a ``chain:`` list attribute, which
+    is then interpreted as the list of processes to run.  Each item in
+    the ``chain:`` list must be a valid data structure defining a
+    `Process`:class: (which see).
     '''
 
     def __init__(self, process_namespaces=['pipette'], definition=None):
@@ -147,6 +156,18 @@ class Pipe(object):
         return '.pipe'
 
     def parse_definition_file(self, definition_filepath):
+        """
+        Read pipeline definition from the given file.
+
+        The pipeline name is set to the name of the file, stripped of
+        the extension.
+
+        **Note:**
+
+        - Any existing definition is *overwritten*.
+        - The file name *must* end with the string returned by
+          `Pipe.pipe_extension`.
+        """
         # Get pipe name.
         pipe_filename = os.path.basename(definition_filepath)
         if not pipe_filename.endswith(self.pipe_extension):
@@ -157,12 +178,12 @@ class Pipe(object):
         # Parse stream.
         with open(definition_filepath) as definition_stream:
             try:
-                self.parse_definition(pipe_name, definition_stream)
+                self._parse_definition(pipe_name, definition_stream)
             except yaml.parser.ParserError as error:
                 raise IOError("File '%s' cannot be parsed as a YAML stream: %s"
                               % (definition_filepath, error))
 
-    def parse_definition(self, pipe_name, stream):
+    def _parse_definition(self, pipe_name, stream):
         self.definition = {'name': pipe_name}
         self.definition.update(yaml.load(stream, Loader=Loader))
 
@@ -215,6 +236,16 @@ class Pipe(object):
         return result
 
     def communicate(self, pipe_streams={}):
+        '''
+        Run processes in the pipeline in a sequence.
+
+        Optional argument `pipe_streams` allows setting the input,
+        output and error streams for the whole pipeline.  Note that
+        only the ``error`` stream setting is shared by all `Process`
+        instances in the pipeline: ``input`` and ``output`` settings
+        are used only for the first (resp. last) process in the
+        pipeline.
+        '''
         pipe_streams = self._get_default_streams(pipe_streams)
         self.chain = list(self._instanciate_processes())
         chain_size = len(self.chain)
