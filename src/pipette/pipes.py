@@ -185,8 +185,7 @@ class Pipe(object):
         # ensure the process has a name
         default_process_name = process.__class__.__name__.lower()
         process.parameters['name'] = process_description.get(
-            'name', default_process_name,
-        )
+            'name', default_process_name)
         return process
 
     def find_process_class(self, process_type):
