@@ -167,11 +167,24 @@ class Pipe(object):
     def _instanciate_processes(self):
         '''Iterator that bakes processes'''
         for process_description in self.definition['chain']:
-            process = self.instantiate_process(process_description)
+            process = self._instanciate_process(process_description)
             default_parameters = process_description.get(
                 'default_parameters', {})
             process.parameters.update(default_parameters)
             yield process
+
+    def _instanciate_process(self, process_description,
+                            default_type='BashCommand'):
+        cls = self.find_process_class(
+            process_description.get('type', default_type))
+        process = cls()
+        assert isinstance(process, Process)
+        default_process_name = process.__class__.__name__.lower()
+        process.parameters['name'] = process_description.get(
+            'name', default_process_name,
+        )
+        process.description.update(process_description)
+        return process
 
     def find_process_class(self, process_type):
         module = None
@@ -186,19 +199,6 @@ class Pipe(object):
             raise ImportError('Failed to find/import process type: %s in %s' %
                               (process_type, self.process_namespaces))
         return getattr(module, class_name)
-
-    def instantiate_process(self, process_description,
-                            default_type='BashCommand'):
-        cls = self.find_process_class(
-            process_description.get('type', default_type))
-        process = cls()
-        assert isinstance(process, Process)
-        default_process_name = process.__class__.__name__.lower()
-        process.parameters['name'] = process_description.get(
-            'name', default_process_name,
-        )
-        process.description.update(process_description)
-        return process
 
     @staticmethod
     def _get_default_streams(streams):
