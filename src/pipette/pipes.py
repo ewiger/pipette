@@ -152,7 +152,8 @@ class Pipe(object):
         if not pipe_filename.endswith(self.pipe_extension):
             raise Exception('Wrong pipe description filename: %s' %
                             pipe_filename)
-        pipe_name = pipe_filename.replace(self.pipe_extension, '')
+        # remove extension
+        pipe_name = pipe_filename[:-len(self.pipe_extension)]
         # Parse stream.
         with open(definition_filepath) as definition_stream:
             try:
