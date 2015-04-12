@@ -220,18 +220,14 @@ class Pipe(object):
         for index, process in enumerate(self.chain):
             # Prepare stream wiring.
             process.streams['error'] = pipe_streams['error']
-            if chain_size == 1:
-                # Single process.
-                process.streams['input'] = pipe_streams['input']
-                process.streams['output'] = pipe_streams['output']
-            elif index == 0:
+            if index == 0:
                 # First process.
                 process.streams['input'] = pipe_streams['input']
             else:
                 # In-between process.
                 process.streams['input'] = input_stream
 
-            if index == chain_size:
+            if index == chain_size - 1:
                 # Last process.
                 process.streams['output'] = pipe_streams['output']
             else:
