@@ -164,7 +164,7 @@ class Pipe(object):
         self.definition = {'name': pipe_name}
         self.definition.update(yaml.load(stream, Loader=Loader))
 
-    def bake_processes(self):
+    def _instanciate_processes(self):
         '''Iterator that bakes processes'''
         for process_description in self.definition['chain']:
             process = self.instantiate_process(process_description)
@@ -213,7 +213,7 @@ class Pipe(object):
 
     def communicate(self, pipe_streams={}):
         pipe_streams = self._get_default_streams(pipe_streams)
-        self.chain = list(self.bake_processes())
+        self.chain = list(self._instanciate_processes())
         chain_size = len(self.chain)
         assert chain_size > 0
         output_stream = StringIO()
