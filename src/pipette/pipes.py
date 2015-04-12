@@ -100,21 +100,22 @@ class BashCommand(Process):
             assert self.is_filepath_safe(file_path)
             command_input = open(file_path)
         else:
-            command_input = StringIO(self.parameters.get('command_input', ''))
+            command_input = None
 
         if 'output_filepath' in self.parameters:
             file_path = self.parameters['output_filepath']
             assert self.is_filepath_safe(file_path)
             command_output = open(file_path, 'w+')
         else:
-            command_output = StringIO()
+            command_output = None
 
         if 'error_filepath' in self.parameters:
             file_path = self.parameters['error_filepath']
             assert self.is_filepath_safe(file_path)
             command_error = open(file_path, 'w+')
         else:
-            command_error = StringIO()
+            command_error = None
+
         # Call the subprocess.
         subprocess = Popen(
             bash_command,
@@ -125,12 +126,6 @@ class BashCommand(Process):
             executable='/bin/bash',
         )
         subprocess.communicate()
-        # Collect results.
-        self.results.update(self.parameters)
-        if 'output_filepath' not in self.results:
-            self.results['output'] = command_output.getvalue()
-        if 'error_filepath' not in self.results:
-            self.results['error'] = command_error.getvalue()
 
 
 class Pipe(object):
