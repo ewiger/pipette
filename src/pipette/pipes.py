@@ -5,10 +5,13 @@ Copyright (c) 2014 Yauhen Yakimovich
 Licensed under the MIT License (MIT). Read a copy of LICENSE distributed with
 this code.
 '''
+
+from abc import ABCMeta, abstractmethod
 import os
 import sys
 from StringIO import StringIO
 from subprocess import Popen
+
 import yaml
 try:
     from yaml import CLoader as Loader, CDumper as Dumper
@@ -17,6 +20,7 @@ except ImportError:
 
 
 class Process(object):
+    __metaclass__ = ABCMeta
 
     def __init__(self):
         self.description = dict()
@@ -69,11 +73,13 @@ class Process(object):
         # Input
         self.parse_input()
 
+    @abstractmethod
     def run(self):
         '''
         This method does actual work using self.parameters and saving results
         into self.results.
         '''
+        raise NotImplemented("Called abstract method `Process.run`")
 
     def reduce(self):
         '''Reduce execution. Happens after run(). Can be results join.'''
