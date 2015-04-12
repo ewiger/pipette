@@ -128,9 +128,9 @@ class BashCommand(Process):
         # Collect results.
         self.results.update(self.parameters)
         if 'output_filepath' not in self.results:
-            self.results['output'] = command_output.get_value()
+            self.results['output'] = command_output.getvalue()
         if 'error_filepath' not in self.results:
-            self.results['error'] = command_error.get_value()
+            self.results['error'] = command_error.getvalue()
 
 
 class Pipe(object):
