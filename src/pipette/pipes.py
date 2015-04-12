@@ -244,7 +244,19 @@ class Pipe(object):
 
             # Maintain stream wiring.
             input_stream = output_stream
-            input_stream.seek(0)  # Make sure to rewind.
+            try:
+                # The code assumes that `input_stream` (== former
+                # `output_stream`) is a seekable stream (e.g.,
+                # StringIO) but this fails when the chain consists of
+                # a single process.  In this case, however, we can
+                # ignore if the seek operation fails.
+                input_stream.seek(0)
+            except IOError as err:
+                # errno 29 is "Illegal seek"
+                if err.errno == 29 and chain_size == 1:
+                    pass
+                else:
+                    raise
             output_stream = StringIO()
 
     def execute_process(self, process, parameters):
