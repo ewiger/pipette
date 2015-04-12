@@ -167,11 +167,7 @@ class Pipe(object):
     def _instanciate_processes(self):
         '''Iterator that bakes processes'''
         for process_description in self.definition['chain']:
-            process = self._instanciate_process(process_description)
-            default_parameters = process_description.get(
-                'default_parameters', {})
-            process.parameters.update(default_parameters)
-            yield process
+            yield self._instanciate_process(process_description)
 
     def _instanciate_process(self, process_description,
                             default_type='BashCommand'):
@@ -179,11 +175,17 @@ class Pipe(object):
             process_description.get('type', default_type))
         process = cls()
         assert isinstance(process, Process)
+        # record the description used to build this
+        process.description.update(process_description)
+        # add default params
+        default_parameters = process_description.get(
+            'default_parameters', {})
+        process.parameters.update(default_parameters)
+        # ensure the process has a name
         default_process_name = process.__class__.__name__.lower()
         process.parameters['name'] = process_description.get(
             'name', default_process_name,
         )
-        process.description.update(process_description)
         return process
 
     def find_process_class(self, process_type):
