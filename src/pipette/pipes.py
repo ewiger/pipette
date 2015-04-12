@@ -16,16 +16,6 @@ except ImportError:
     from yaml import Loader, Dumper
 
 
-def get_default_streams(streams):
-    if 'input' not in streams:
-        streams['input'] = sys.stdin
-    if 'output' not in streams:
-        streams['output'] = sys.stdout
-    if 'error' not in streams:
-        streams['error'] = sys.stderr
-    return streams
-
-
 class Process(object):
 
     def __init__(self):
@@ -210,8 +200,19 @@ class Pipe(object):
         process.description.update(process_description)
         return process
 
+    @staticmethod
+    def _get_default_streams(streams):
+        result = {}
+        for name, default in (
+                ('input',  sys.stdin),
+                ('output', sys.stdout),
+                ('error',  sys.stderr),
+        ):
+            result[name] = streams.get(name, default)
+        return result
+
     def communicate(self, pipe_streams={}):
-        pipe_streams = get_default_streams(pipe_streams)
+        pipe_streams = self._get_default_streams(pipe_streams)
         self.chain = list(self.bake_processes())
         chain_size = len(self.chain)
         assert chain_size > 0
