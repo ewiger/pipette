@@ -1,0 +1,8 @@
+# Hey Emacs, this is -*- yaml -*-
+---
+name: 'foo_pipe'
+
+chain:
+    - type: 'test_workflow.FooProcess'
+      foo_value: 'baz'
+
