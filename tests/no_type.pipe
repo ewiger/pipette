@@ -1,0 +1,7 @@
+# Hey Emacs, this is -*- yaml -*-
+---
+name: 'foo_pipe'
+
+chain:
+    - foo_value: 'baz'
+

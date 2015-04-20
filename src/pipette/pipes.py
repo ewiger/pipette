@@ -5,10 +5,13 @@ Copyright (c) 2014 Yauhen Yakimovich
 Licensed under the MIT License (MIT). Read a copy of LICENSE distributed with
 this code.
 '''
+
+from abc import ABCMeta, abstractmethod
 import os
 import sys
 from StringIO import StringIO
 from subprocess import Popen
+
 import yaml
 try:
     from yaml import CLoader as Loader, CDumper as Dumper
@@ -16,17 +19,8 @@ except ImportError:
     from yaml import Loader, Dumper
 
 
-def get_default_streams(streams):
-    if 'input' not in streams:
-        streams['input'] = sys.stdin
-    if 'output' not in streams:
-        streams['output'] = sys.stdout
-    if 'error' not in streams:
-        streams['error'] = sys.stderr
-    return streams
-
-
 class Process(object):
+    __metaclass__ = ABCMeta
 
     def __init__(self):
         self.description = dict()
@@ -79,11 +73,13 @@ class Process(object):
         # Input
         self.parse_input()
 
+    @abstractmethod
     def run(self):
         '''
         This method does actual work using self.parameters and saving results
         into self.results.
         '''
+        raise NotImplemented("Called abstract method `Process.run`")
 
     def reduce(self):
         '''Reduce execution. Happens after run(). Can be results join.'''
@@ -104,21 +100,22 @@ class BashCommand(Process):
             assert self.is_filepath_safe(file_path)
             command_input = open(file_path)
         else:
-            command_input = StringIO(self.parameters.get('command_input', ''))
+            command_input = None
 
         if 'output_filepath' in self.parameters:
             file_path = self.parameters['output_filepath']
             assert self.is_filepath_safe(file_path)
             command_output = open(file_path, 'w+')
         else:
-            command_output = StringIO()
+            command_output = None
 
         if 'error_filepath' in self.parameters:
             file_path = self.parameters['error_filepath']
             assert self.is_filepath_safe(file_path)
             command_error = open(file_path, 'w+')
         else:
-            command_error = StringIO()
+            command_error = None
+
         # Call the subprocess.
         subprocess = Popen(
             bash_command,
@@ -129,20 +126,23 @@ class BashCommand(Process):
             executable='/bin/bash',
         )
         subprocess.communicate()
-        # Collect results.
-        self.results.update(self.parameters)
-        if 'output_filepath' not in self.results:
-            self.results['output'] = command_output.get_value()
-        if 'error_filepath' not in self.results:
-            self.results['error'] = command_error.get_value()
 
 
 class Pipe(object):
     '''
     A trivial chain of processes defined by YAML.
+
+    The pipeline is defined by a single YAML file, which is read by
+    :meth:`parse_definition_file` *or* passed to the constructor with
+    the `definition` parameter.
+
+    The definition should contain a ``chain:`` list attribute, which
+    is then interpreted as the list of processes to run.  Each item in
+    the ``chain:`` list must be a valid data structure defining a
+    `Process`:class: (which see).
     '''
 
-    def __init__(self, process_namespaces=['pippete'], definition=None):
+    def __init__(self, process_namespaces=['pipette'], definition=None):
         self.process_namespaces = process_namespaces
         self.definition = definition
         self.chain = None
@@ -156,32 +156,59 @@ class Pipe(object):
         return '.pipe'
 
     def parse_definition_file(self, definition_filepath):
+        """
+        Read pipeline definition from the given file.
+
+        The pipeline name is set to the name of the file, stripped of
+        the extension.
+
+        **Note:**
+
+        - Any existing definition is *overwritten*.
+        - The file name *must* end with the string returned by
+          `Pipe.pipe_extension`.
+        """
         # Get pipe name.
         pipe_filename = os.path.basename(definition_filepath)
         if not pipe_filename.endswith(self.pipe_extension):
             raise Exception('Wrong pipe description filename: %s' %
                             pipe_filename)
-        pipe_name = pipe_filename.replace(self.pipe_extension, '')
+        # remove extension
+        pipe_name = pipe_filename[:-len(self.pipe_extension)]
         # Parse stream.
         with open(definition_filepath) as definition_stream:
             try:
-                self.parse_definition(pipe_name, definition_stream)
+                self._parse_definition(pipe_name, definition_stream)
             except yaml.parser.ParserError as error:
-                raise IOError('YAML parsing error in: "%s".\n%s' %
-                              (definition_filepath, str(error)))
+                raise IOError("File '%s' cannot be parsed as a YAML stream: %s"
+                              % (definition_filepath, error))
 
-    def parse_definition(self, pipe_name, stream):
+    def _parse_definition(self, pipe_name, stream):
         self.definition = {'name': pipe_name}
         self.definition.update(yaml.load(stream, Loader=Loader))
 
-    def bake_processes(self):
+    def _instanciate_processes(self):
         '''Iterator that bakes processes'''
         for process_description in self.definition['chain']:
-            process = self.instantiate_process(process_description)
-            default_parameters = process_description.get(
-                'default_parameters', {})
-            process.parameters.update(default_parameters)
-            yield process
+            yield self._instanciate_process(process_description)
+
+    def _instanciate_process(self, process_description,
+                            default_type='BashCommand'):
+        cls = self.find_process_class(
+            process_description.get('type', default_type))
+        process = cls()
+        assert isinstance(process, Process)
+        # record the description used to build this
+        process.description.update(process_description)
+        # add default params
+        default_parameters = process_description.get(
+            'default_parameters', {})
+        process.parameters.update(default_parameters)
+        # ensure the process has a name
+        default_process_name = process.__class__.__name__.lower()
+        process.parameters['name'] = process_description.get(
+            'name', default_process_name)
+        return process
 
     def find_process_class(self, process_type):
         module = None
@@ -197,22 +224,30 @@ class Pipe(object):
                               (process_type, self.process_namespaces))
         return getattr(module, class_name)
 
-    def instantiate_process(self, process_description,
-                            default_type='BashCommand'):
-        cls = self.find_process_class(
-            process_description.get('type', default_type))
-        process = cls()
-        assert isinstance(process, Process)
-        default_process_name = process.__class__.__name__.lower()
-        process.parameters['name'] = process_description.get(
-            'name', default_process_name,
-        )
-        process.description.update(process_description)
-        return process
+    @staticmethod
+    def _get_default_streams(streams):
+        result = {}
+        for name, default in (
+                ('input',  sys.stdin),
+                ('output', sys.stdout),
+                ('error',  sys.stderr),
+        ):
+            result[name] = streams.get(name, default)
+        return result
 
     def communicate(self, pipe_streams={}):
-        pipe_streams = get_default_streams(pipe_streams)
-        self.chain = list(self.bake_processes())
+        '''
+        Run processes in the pipeline in a sequence.
+
+        Optional argument `pipe_streams` allows setting the input,
+        output and error streams for the whole pipeline.  Note that
+        only the ``error`` stream setting is shared by all `Process`
+        instances in the pipeline: ``input`` and ``output`` settings
+        are used only for the first (resp. last) process in the
+        pipeline.
+        '''
+        pipe_streams = self._get_default_streams(pipe_streams)
+        self.chain = list(self._instanciate_processes())
         chain_size = len(self.chain)
         assert chain_size > 0
         output_stream = StringIO()
@@ -220,18 +255,14 @@ class Pipe(object):
         for index, process in enumerate(self.chain):
             # Prepare stream wiring.
             process.streams['error'] = pipe_streams['error']
-            if chain_size == 1:
-                # Single process.
-                process.streams['input'] = pipe_streams['input']
-                process.streams['output'] = pipe_streams['output']
-            elif index == 0:
+            if index == 0:
                 # First process.
                 process.streams['input'] = pipe_streams['input']
             else:
                 # In-between process.
                 process.streams['input'] = input_stream
 
-            if index == chain_size:
+            if index == chain_size - 1:
                 # Last process.
                 process.streams['output'] = pipe_streams['output']
             else:
@@ -245,7 +276,19 @@ class Pipe(object):
 
             # Maintain stream wiring.
             input_stream = output_stream
-            input_stream.seek(0)  # Make sure to rewind.
+            try:
+                # The code assumes that `input_stream` (== former
+                # `output_stream`) is a seekable stream (e.g.,
+                # StringIO) but this fails when the chain consists of
+                # a single process.  In this case, however, we can
+                # ignore if the seek operation fails.
+                input_stream.seek(0)
+            except IOError as err:
+                # errno 29 is "Illegal seek"
+                if err.errno == 29 and chain_size == 1:
+                    pass
+                else:
+                    raise
             output_stream = StringIO()
 
     def execute_process(self, process, parameters):
